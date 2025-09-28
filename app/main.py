@@ -38,12 +38,13 @@ def health():
 
 
 _DB = {"issues": []}
+_ID_SEQ = 1
 
 
 @app.post("/issues", response_model=Issue)
 def create_issue(issue: IssueCreate):
     global _ID_SEQ
-    new_issue = Issue(id=_ID_SEQ, **issue.dict())
+    new_issue = Issue(id=_ID_SEQ, **issue.model_dump())
     _DB["issues"].append(new_issue)
     _ID_SEQ += 1
     return new_issue
@@ -54,17 +55,17 @@ def get_issue(issue_id: int):
     for issue in _DB["issues"]:
         if issue.id == issue_id:
             return issue
-    raise ApiError(status_code=404, detail="Issue not found")
+    raise ApiError(code="nf_error", message="Issue not found", status=404)
 
 
 @app.put("/issues/{issue_id}", response_model=Issue)
 def update_issue(issue_id: int, data: IssueCreate):
     for i, issue in enumerate(_DB["issues"]):
         if issue.id == issue_id:
-            updated = Issue(id=issue_id, **data.dict())
+            updated = Issue(id=issue_id, **data.model_dump())
             _DB["issues"][i] = updated
             return updated
-    raise ApiError(status_code=404, detail="Issue not found")
+    raise ApiError(code="nf_error", message="Issue not found", status=404)
 
 
 @app.delete("/issues/{issue_id}")
@@ -73,7 +74,7 @@ def delete_issue(issue_id: int):
         if issue.id == issue_id:
             del _DB["issues"][i]
             return {"message": "deleted"}
-    raise ApiError(status_code=404, detail="Issue not found")
+    raise ApiError(code="nf_error", message="Issue not found", status=404)
 
 
 @app.get("/issues", response_model=List[Issue])

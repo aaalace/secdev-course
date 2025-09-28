@@ -5,7 +5,7 @@
 ## Быстрый старт
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\Activate.ps1
+source .venv/bin/activate
 pip install -r requirements.txt -r requirements-dev.txt
 pre-commit install
 uvicorn app.main:app --reload
@@ -37,11 +37,6 @@ docker run --rm -p 8000:8000 secdev-app
 docker compose up --build
 docker compose --profile dev up --build # dev
 ```
-
-## Эндпойнты
-- `GET /health` → `{"status": "ok"}`
-- `POST /items?name=...` — демо-сущность
-- `GET /items/{id}`
 
 ## Формат ошибок
 Все ошибки — JSON-обёртка:
