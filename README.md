@@ -35,6 +35,7 @@ docker build -t secdev-app .
 docker run --rm -p 8000:8000 secdev-app
 # или
 docker compose up --build
+docker compose --profile dev up --build # dev
 ```
 
 ## Эндпойнты

@@ -1,7 +1,11 @@
-from fastapi import FastAPI, HTTPException, Request
+from typing import List, Optional
+
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
-app = FastAPI(title="SecDev Course App", version="0.1.0")
+from app.issue import Issue, IssueCreate
+
+app = FastAPI(title="Issue Lite", version="0.1.0")
 
 
 class ApiError(Exception):
@@ -21,7 +25,6 @@ async def api_error_handler(request: Request, exc: ApiError):
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    # Normalize FastAPI HTTPException into our error envelope
     detail = exc.detail if isinstance(exc.detail, str) else "http_error"
     return JSONResponse(
         status_code=exc.status_code,
@@ -34,24 +37,52 @@ def health():
     return {"status": "ok"}
 
 
-# Example minimal entity (for tests/demo)
-_DB = {"items": []}
+_DB = {"issues": []}
 
 
-@app.post("/items")
-def create_item(name: str):
-    if not name or len(name) > 100:
-        raise ApiError(
-            code="validation_error", message="name must be 1..100 chars", status=422
-        )
-    item = {"id": len(_DB["items"]) + 1, "name": name}
-    _DB["items"].append(item)
-    return item
+@app.post("/issues", response_model=Issue)
+def create_issue(issue: IssueCreate):
+    global _ID_SEQ
+    new_issue = Issue(id=_ID_SEQ, **issue.dict())
+    _DB["issues"].append(new_issue)
+    _ID_SEQ += 1
+    return new_issue
 
 
-@app.get("/items/{item_id}")
-def get_item(item_id: int):
-    for it in _DB["items"]:
-        if it["id"] == item_id:
-            return it
-    raise ApiError(code="not_found", message="item not found", status=404)
+@app.get("/issues/{issue_id}", response_model=Issue)
+def get_issue(issue_id: int):
+    for issue in _DB["issues"]:
+        if issue.id == issue_id:
+            return issue
+    raise ApiError(status_code=404, detail="Issue not found")
+
+
+@app.put("/issues/{issue_id}", response_model=Issue)
+def update_issue(issue_id: int, data: IssueCreate):
+    for i, issue in enumerate(_DB["issues"]):
+        if issue.id == issue_id:
+            updated = Issue(id=issue_id, **data.dict())
+            _DB["issues"][i] = updated
+            return updated
+    raise ApiError(status_code=404, detail="Issue not found")
+
+
+@app.delete("/issues/{issue_id}")
+def delete_issue(issue_id: int):
+    for i, issue in enumerate(_DB["issues"]):
+        if issue.id == issue_id:
+            del _DB["issues"][i]
+            return {"message": "deleted"}
+    raise ApiError(status_code=404, detail="Issue not found")
+
+
+@app.get("/issues", response_model=List[Issue])
+def list_issues(
+    label: Optional[str] = Query(None), status: Optional[str] = Query(None)
+):
+    results = _DB["issues"]
+    if label:
+        results = [i for i in results if label in i.labels]
+    if status:
+        results = [i for i in results if i.status == status]
+    return results
