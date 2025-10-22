@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse
 from app.main import app
 
 _RATE_LIMIT_STORAGE = defaultdict(list)
-RATE_LIMIT_REQUESTS = 100
+RATE_LIMIT_REQUESTS = 200
 RATE_LIMIT_WINDOW = 60
 
 
