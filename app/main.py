@@ -1,11 +1,19 @@
+import time
+from collections import defaultdict
 from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.issue import Issue, IssueCreate
 
 app = FastAPI(title="Issue Lite", version="0.1.0")
+
+# Rate limiting storage
+_RATE_LIMIT_STORAGE = defaultdict(list)
+RATE_LIMIT_REQUESTS = 100
+RATE_LIMIT_WINDOW = 60  # seconds
 
 
 class ApiError(Exception):
@@ -32,6 +40,42 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={"error": {"code": "validation_error", "message": str(exc)}},
+    )
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    client_ip = request.client.host
+    current_time = time.time()
+
+    # Clean old requests outside the window
+    _RATE_LIMIT_STORAGE[client_ip] = [
+        req_time
+        for req_time in _RATE_LIMIT_STORAGE[client_ip]
+        if current_time - req_time < RATE_LIMIT_WINDOW
+    ]
+
+    # Check if rate limit exceeded
+    if len(_RATE_LIMIT_STORAGE[client_ip]) >= RATE_LIMIT_REQUESTS:
+        return JSONResponse(
+            status_code=429,
+            content={
+                "error": {"code": "rate_limit_exceeded", "message": "Too many requests"}
+            },
+        )
+
+    # Add current request
+    _RATE_LIMIT_STORAGE[client_ip].append(current_time)
+
+    response = await call_next(request)
+    return response
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -52,6 +96,10 @@ def create_issue(issue: IssueCreate):
 
 @app.get("/issues/{issue_id}", response_model=Issue)
 def get_issue(issue_id: int):
+    if issue_id <= 0:
+        raise ApiError(
+            code="invalid_id", message="Issue ID must be positive", status=400
+        )
     for issue in _DB["issues"]:
         if issue.id == issue_id:
             return issue
