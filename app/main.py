@@ -2,18 +2,28 @@ import time
 from collections import defaultdict
 from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 
+from app.database import get_db, init_db
 from app.issue import Issue, IssueCreate
+from app.models import IssueModel
 
 app = FastAPI(title="Issue Lite", version="0.1.0")
+
+
+# Initialize database
+@app.on_event("startup")
+def startup():
+    init_db()
+
 
 # Rate limiting storage
 _RATE_LIMIT_STORAGE = defaultdict(list)
 RATE_LIMIT_REQUESTS = 100
-RATE_LIMIT_WINDOW = 60  # seconds
+RATE_LIMIT_WINDOW = 60
 
 
 class ApiError(Exception):
@@ -49,18 +59,25 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
 
 
 @app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    return response
+
+
+@app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     client_ip = request.client.host
     current_time = time.time()
 
-    # Clean old requests outside the window
     _RATE_LIMIT_STORAGE[client_ip] = [
         req_time
         for req_time in _RATE_LIMIT_STORAGE[client_ip]
         if current_time - req_time < RATE_LIMIT_WINDOW
     ]
 
-    # Check if rate limit exceeded
     if len(_RATE_LIMIT_STORAGE[client_ip]) >= RATE_LIMIT_REQUESTS:
         return JSONResponse(
             status_code=429,
@@ -69,7 +86,6 @@ async def rate_limit_middleware(request: Request, call_next):
             },
         )
 
-    # Add current request
     _RATE_LIMIT_STORAGE[client_ip].append(current_time)
 
     response = await call_next(request)
@@ -81,57 +97,93 @@ def health():
     return {"status": "ok"}
 
 
-_DB = {"issues": []}
-_ID_SEQ = 1
-
-
 @app.post("/issues", response_model=Issue)
-def create_issue(issue: IssueCreate):
-    global _ID_SEQ
-    new_issue = Issue(id=_ID_SEQ, **issue.model_dump())
-    _DB["issues"].append(new_issue)
-    _ID_SEQ += 1
-    return new_issue
+def create_issue(issue: IssueCreate, db: Session = Depends(get_db)):
+    new_issue = IssueModel(
+        title=issue.title, labels=issue.labels, due_at=issue.due_at, status=issue.status
+    )
+    db.add(new_issue)
+    db.commit()
+    db.refresh(new_issue)
+    return Issue(
+        id=new_issue.id,
+        title=new_issue.title,
+        labels=new_issue.labels,
+        due_at=new_issue.due_at,
+        status=new_issue.status,
+    )
 
 
 @app.get("/issues/{issue_id}", response_model=Issue)
-def get_issue(issue_id: int):
+def get_issue(issue_id: int, db: Session = Depends(get_db)):
     if issue_id <= 0:
         raise ApiError(
             code="invalid_id", message="Issue ID must be positive", status=400
         )
-    for issue in _DB["issues"]:
-        if issue.id == issue_id:
-            return issue
-    raise ApiError(code="nf_error", message="Issue not found", status=404)
+    issue = db.query(IssueModel).filter(IssueModel.id == issue_id).first()
+    if not issue:
+        raise ApiError(code="nf_error", message="Issue not found", status=404)
+    return Issue(
+        id=issue.id,
+        title=issue.title,
+        labels=issue.labels,
+        due_at=issue.due_at,
+        status=issue.status,
+    )
 
 
 @app.put("/issues/{issue_id}", response_model=Issue)
-def update_issue(issue_id: int, data: IssueCreate):
-    for i, issue in enumerate(_DB["issues"]):
-        if issue.id == issue_id:
-            updated = Issue(id=issue_id, **data.model_dump())
-            _DB["issues"][i] = updated
-            return updated
-    raise ApiError(code="nf_error", message="Issue not found", status=404)
+def update_issue(issue_id: int, data: IssueCreate, db: Session = Depends(get_db)):
+    issue = db.query(IssueModel).filter(IssueModel.id == issue_id).first()
+    if not issue:
+        raise ApiError(code="nf_error", message="Issue not found", status=404)
+
+    issue.title = data.title
+    issue.labels = data.labels
+    issue.due_at = data.due_at
+    issue.status = data.status
+
+    db.commit()
+    db.refresh(issue)
+
+    return Issue(
+        id=issue.id,
+        title=issue.title,
+        labels=issue.labels,
+        due_at=issue.due_at,
+        status=issue.status,
+    )
 
 
 @app.delete("/issues/{issue_id}")
-def delete_issue(issue_id: int):
-    for i, issue in enumerate(_DB["issues"]):
-        if issue.id == issue_id:
-            del _DB["issues"][i]
-            return {"message": "deleted"}
-    raise ApiError(code="nf_error", message="Issue not found", status=404)
+def delete_issue(issue_id: int, db: Session = Depends(get_db)):
+    issue = db.query(IssueModel).filter(IssueModel.id == issue_id).first()
+    if not issue:
+        raise ApiError(code="nf_error", message="Issue not found", status=404)
+
+    db.delete(issue)
+    db.commit()
+    return {"message": "deleted"}
 
 
 @app.get("/issues", response_model=List[Issue])
 def list_issues(
-    label: Optional[str] = Query(None), status: Optional[str] = Query(None)
+    label: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
 ):
-    results = _DB["issues"]
+    query = db.query(IssueModel)
+
+    if search:
+        query = query.filter(IssueModel.title.ilike(f"%{search}%"))
     if label:
-        results = [i for i in results if label in i.labels]
+        query = query.filter(IssueModel.labels.contains([label]))
     if status:
-        results = [i for i in results if i.status == status]
-    return results
+        query = query.filter(IssueModel.status == status)
+
+    issues = query.all()
+    return [
+        Issue(id=i.id, title=i.title, labels=i.labels, due_at=i.due_at, status=i.status)
+        for i in issues
+    ]
