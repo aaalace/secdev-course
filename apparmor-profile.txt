@@ -1,0 +1,51 @@
+#include <tunables/global>
+
+profile issue-lite-app flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+  #include <abstractions/python>
+  #include <abstractions/nameservice>
+
+  network inet stream,
+  network inet6 stream,
+  network inet dgram,
+  network inet6 dgram,
+  network unix stream,
+
+  /app/** r,
+  /home/appuser/.local/** r,
+  /usr/local/lib/python3.11/** r,
+
+  /app/**/__pycache__/ rw,
+  /app/**/__pycache__/** rw,
+  /home/appuser/.local/**/__pycache__/ rw,
+  /home/appuser/.local/**/__pycache__/** rw,
+
+  /tmp/** rw,
+  owner /tmp/** rw,
+
+  /etc/ssl/openssl.cnf r,
+  /etc/hosts r,
+  /etc/resolv.conf r,
+  /etc/nsswitch.conf r,
+  /etc/passwd r,
+  /etc/group r,
+
+  @{PROC}/sys/kernel/random/boot_id r,
+  @{PROC}/sys/vm/overcommit_memory r,
+  @{PROC}/@{pid}/fd/ r,
+  @{PROC}/stat r,
+
+  deny capability sys_admin,
+  deny capability sys_module,
+  deny capability sys_rawio,
+  deny capability sys_ptrace,
+  deny capability mac_admin,
+  deny capability mac_override,
+
+  deny /boot/** rwx,
+  deny /sys/** rwx,
+  deny /proc/sys/** rwx,
+  deny /proc/sysrq-trigger rwx,
+  deny /proc/mem rwx,
+  deny /proc/kmem rwx,
+}
