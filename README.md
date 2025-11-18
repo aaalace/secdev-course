@@ -1,5 +1,7 @@
 # SecDev Course Template
 
+[![CI (minimal)](https://github.com/aaalace/secdev-course/actions/workflows/ci.yml/badge.svg?branch=p08-cicd-minimal)](https://github.com/aaalace/secdev-course/actions/workflows/ci.yml)
+
 Стартовый шаблон для студенческого репозитория (HSE SecDev 2025).
 
 ## Быстрый старт
