@@ -1,6 +1,90 @@
-title = "Gitleaks baseline (extend in P10)"
+title = "Gitleaks configuration for issue-lite project"
+
+[extend]
+useDefault = true
+
+[[allowlist]]
+description = "Ignore test fixtures and example files"
+paths = [
+  '''tests/fixtures/.*''',
+  '''.*\.example$''',
+  '''.*\.sample$''',
+  '''docs/.*''',
+]
+
+[[allowlist]]
+description = "Ignore dummy secrets in .env.example"
+regexes = [
+  '''(?i)changeme''',
+  '''(?i)your-.*-here''',
+  '''(?i)dummy.*''',
+  '''(?i)example.*''',
+]
+
+[[allowlist]]
+description = "Ignore commit hashes that look like secrets"
+regexTarget = "match"
+regexes = [
+  '''[a-f0-9]{40}''',
+]
+
+[[allowlist]]
+description = "Ignore JWT tokens in test files"
+paths = [
+  '''tests/.*\.py$''',
+]
+regexTarget = "match"
+regexes = [
+  '''eyJ[A-Za-z0-9_-]*\.eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*''',
+]
+
 [[rules]]
-description = "Generic secret (example disabled)"
-regex = '''(?i)dummy-never-match'''
-entropy = 5.0
-filename = "nowhere"
+id = "project-api-key"
+description = "Project-specific API key pattern"
+regex = '''(?i)(api[_-]?key|apikey)\s*[:=]\s*['"][a-z0-9]{32,}['"]'''
+entropy = 3.5
+secretGroup = 2
+keywords = [
+  "apikey",
+  "api_key",
+  "api-key",
+]
+
+[[rules]]
+id = "database-connection-string"
+description = "Database connection string with credentials"
+regex = '''(?i)(postgres|mysql|mongodb)://[^:]+:[^@]+@[^/]+/[^\s'"]+'''
+secretGroup = 0
+keywords = [
+  "postgres://",
+  "mysql://",
+  "mongodb://",
+]
+
+[[allowlist]]
+description = "Allow placeholder database URL in docker-compose"
+paths = [
+  '''compose\.yaml$''',
+  '''docker-compose\.yml$''',
+]
+regexTarget = "match"
+regexes = [
+  '''postgres://.*@postgres:5432/.*''',
+]
+
+[[allowlist]]
+description = "Allow SECRET_KEY placeholder in settings"
+paths = [
+  '''app/.*\.py$''',
+]
+regexTarget = "line"
+regexes = [
+  '''SECRET_KEY\s*=\s*os\.getenv''',
+  '''SECRET_KEY\s*=\s*settings\.''',
+]
+
+[[allowlist]]
+description = "Ignore EVIDENCE directory - contains security reports"
+paths = [
+  '''EVIDENCE/.*''',
+]

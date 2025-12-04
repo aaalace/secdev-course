@@ -1,0 +1,52 @@
+rules:
+  - id: sql-injection-raw-query
+    patterns:
+      - pattern-either:
+          - pattern: session.execute($Q)
+          - pattern: db.execute($Q)
+      - pattern-not: session.execute(select(...))
+      - pattern-not: session.execute(text(...))
+    message: Potential SQL injection. Use parameterized queries.
+    languages: [python]
+    severity: ERROR
+
+  - id: hardcoded-secret
+    pattern-regex: (password|secret|api_key|token)\s*=\s*['\"][^'\"]{8,}['\"]
+    message: Hardcoded secret detected.
+    languages: [python]
+    severity: ERROR
+
+  - id: unsafe-yaml-load
+    patterns:
+      - pattern-either:
+          - pattern: yaml.load($D)
+          - pattern: yaml.load($D, ...)
+      - pattern-not: yaml.load($D, Loader=yaml.SafeLoader)
+      - pattern-not: yaml.safe_load($D)
+    message: Use yaml.safe_load() instead.
+    languages: [python]
+    severity: ERROR
+
+  - id: debug-mode-enabled
+    patterns:
+      - pattern-either:
+          - pattern: app.run(debug=True)
+          - pattern: uvicorn.run(..., debug=True, ...)
+          - pattern: FastAPI(..., debug=True, ...)
+    message: Debug mode enabled.
+    languages: [python]
+    severity: WARNING
+
+  - id: weak-random
+    patterns:
+      - pattern-either:
+          - pattern: random.random()
+          - pattern: random.randint(...)
+      - pattern-inside: |
+          def $F(...):
+            ...
+            token = ...
+            ...
+    message: Use secrets module for tokens.
+    languages: [python]
+    severity: WARNING
