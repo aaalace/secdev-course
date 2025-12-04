@@ -1,0 +1,14 @@
+waivers:
+  # waiver structure:
+  # - id: CVE-2024-XXXXX
+  #   package: package-name
+  #   version: "1.2.3"
+  #   severity: High
+  #   reason: ...
+  #   justification: risk_accepted | false_positive | mitigated
+  #   mitigation: ...
+  #   created_by: github-username
+  #   created_at: "2025-12-04"
+  #   expires_at: "2026-03-04"
+  #   tracking_issue: "https://github.com/aaalace/secdev-course/issues/XX"
+  #   notes: ...
