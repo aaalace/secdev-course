@@ -35,13 +35,13 @@ jobs:
         run: |
           mkdir -p EVIDENCE/P09
           syft dir:. -o cyclonedx-json > EVIDENCE/P09/sbom.json
-          echo "✅ SBOM generated at EVIDENCE/P09/sbom.json"
-          echo "📊 SBOM size: $(wc -c < EVIDENCE/P09/sbom.json) bytes"
+          echo "SBOM generated at EVIDENCE/P09/sbom.json"
+          echo "SBOM size: $(wc -c < EVIDENCE/P09/sbom.json) bytes"
 
       - name: Run SCA with Grype
         run: |
           grype sbom:EVIDENCE/P09/sbom.json -o json > EVIDENCE/P09/sca_report.json || true
-          echo "✅ SCA report generated at EVIDENCE/P09/sca_report.json"
+          echo "SCA report generated at EVIDENCE/P09/sca_report.json"
 
       - name: Generate SCA Summary
         run: |
@@ -69,7 +69,7 @@ jobs:
               matches = report.get('matches', [])
 
               if not matches:
-                  print("✅ **No vulnerabilities found!**\n")
+                  print("**No vulnerabilities found!**\n")
               else:
                   severities = Counter(m.get('vulnerability', {}).get('severity', 'Unknown') for m in matches)
 
@@ -99,7 +99,7 @@ jobs:
                       if len(critical_high) > 10:
                           print(f"\n_... and {len(critical_high) - 10} more Critical/High issues. See full report._\n")
                   else:
-                      print("✅ No Critical or High severity vulnerabilities found.\n")
+                      print("No Critical or High severity vulnerabilities found.\n")
 
                   print("\n## Action Items\n")
                   print("- Review Critical/High vulnerabilities for immediate action")
@@ -108,17 +108,17 @@ jobs:
                   print("- Track remediation in GitHub Issues")
 
           except Exception as e:
-              print(f"⚠️ Error parsing SCA report: {e}\n")
+              print(f"Error parsing SCA report: {e}\n")
               print("See `EVIDENCE/P09/sca_report.json` for raw results.")
           PYEOF
 
-          echo "✅ SCA summary generated at EVIDENCE/P09/sca_summary.md"
+          echo "SCA summary generated at EVIDENCE/P09/sca_summary.md"
 
       - name: Display Summary
         if: always()
         run: |
           echo "================================"
-          echo "📋 SBOM & SCA Results Summary"
+          echo "SBOM & SCA Results Summary"
           echo "================================"
           cat EVIDENCE/P09/sca_summary.md
 
@@ -144,7 +144,7 @@ jobs:
           echo "Critical vulnerabilities found: $CRITICAL_COUNT"
 
           if [ "$CRITICAL_COUNT" -gt "0" ]; then
-            echo "⚠️ Warning: Found $CRITICAL_COUNT Critical vulnerabilities"
+            echo "Warning: Found $CRITICAL_COUNT Critical vulnerabilities"
             echo "Review EVIDENCE/P09/sca_summary.md and consider fixes or waivers"
             # Uncomment to fail on Critical:
             # exit 1

@@ -11,4 +11,26 @@ waivers:
   #   created_at: "2025-12-04"
   #   expires_at: "2026-03-04"
   #   tracking_issue: "https://github.com/aaalace/secdev-course/issues/XX"
-  #   notes: ...
+  #   notes: Additional context or decision rationale
+
+  # Примерчик:
+  - id: CVE-2023-43804
+    package: urllib3
+    version: "2.2.3"
+    severity: Medium
+    reason: |
+      Demonstration waiver to illustrate vulnerability management process.
+
+      CVE-2023-43804 affects urllib3 < 1.26.17, but our version (2.2.3+)
+      is not vulnerable. This waiver demonstrates the documentation
+      structure for future use.
+    justification: false_positive
+    mitigation: |
+      - Current urllib3 version 2.2.3 is not affected by this CVE
+    created_by: aaalace
+    created_at: "2025-12-04"
+    expires_at: "2026-01-04"
+    tracking_issue: "https://github.com/aaalace/secdev-course/issues/9"
+    notes: |
+      This is a demonstration waiver created to show the complete
+      waiver management workflow as required by the assignment.
