@@ -1,0 +1,91 @@
+name: P12 IaC Container Security
+
+on:
+  push:
+    branches:
+      - p12-iac-container
+      - main
+    paths:
+      - 'Dockerfile'
+      - 'compose.yaml'
+      - 'security/**'
+      - '.github/workflows/ci-p12-iac-container.yml'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  iac-container-security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          config: security/hadolint.yaml
+          format: json
+          output-file: hadolint_report.json
+          no-fail: true
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          config_file: security/checkov.yaml
+          output_format: json
+          output_file_path: console,checkov_report.json
+          soft_fail: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          tags: issue-lite:latest
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: issue-lite:latest
+          format: json
+          output: trivy_report.json
+          severity: CRITICAL,HIGH,MEDIUM
+          exit-code: 0
+
+      - name: Prepare EVIDENCE directory
+        run: |
+          mkdir -p EVIDENCE/P12
+          mv hadolint_report.json EVIDENCE/P12/ || echo "Hadolint report not found"
+          mv checkov_report.json EVIDENCE/P12/ || echo "Checkov report not found"
+          mv trivy_report.json EVIDENCE/P12/ || echo "Trivy report not found"
+
+      - name: Upload reports as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: p12-security-reports
+          path: EVIDENCE/P12/
+          retention-days: 30
+
+      - name: Commit reports
+        if: github.ref == 'refs/heads/p12-iac-container'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add EVIDENCE/P12/
+          git diff --cached --quiet || git commit -m "chore: update P12 security reports [skip ci]"
+          git push

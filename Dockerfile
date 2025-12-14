@@ -1,9 +1,9 @@
-FROM python:3.11-slim AS builder
+FROM python:3.11.11-slim AS builder
 WORKDIR /build
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
+    gcc=4:12.2.0-3 \
+    libpq-dev=15.10-0+deb12u1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt requirements-dev.txt ./
@@ -14,11 +14,11 @@ ENV PATH=/root/.local/bin:$PATH
 COPY . .
 RUN pytest -q
 
-FROM python:3.11-slim AS runtime
+FROM python:3.11.11-slim AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
-    curl \
+    libpq5=15.10-0+deb12u1 \
+    curl=7.88.1-10+deb12u8 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get purge -y --auto-remove
 

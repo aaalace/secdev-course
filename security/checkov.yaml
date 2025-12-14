@@ -1,0 +1,10 @@
+framework:
+  - dockerfile
+  - kubernetes
+
+download-external-modules: false
+evaluate-variables: true
+
+skip-check:
+  - CKV_DOCKER_2
+  - CKV_DOCKER_3

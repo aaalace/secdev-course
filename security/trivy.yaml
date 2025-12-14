@@ -1,0 +1,15 @@
+severity:
+  - CRITICAL
+  - HIGH
+  - MEDIUM
+
+scan:
+  skip-dirs:
+    - node_modules
+    - venv
+    - .git
+
+vuln:
+  type:
+    - os
+    - library
