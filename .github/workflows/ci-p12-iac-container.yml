@@ -80,12 +80,3 @@ jobs:
           name: p12-security-reports
           path: EVIDENCE/P12/
           retention-days: 30
-
-      - name: Commit reports
-        if: github.ref == 'refs/heads/p12-iac-container'
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add EVIDENCE/P12/
-          git diff --cached --quiet || git commit -m "chore: update P12 security reports [skip ci]"
-          git push
