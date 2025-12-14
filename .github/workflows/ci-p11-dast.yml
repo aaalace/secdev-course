@@ -1,0 +1,100 @@
+name: P11 DAST ZAP Baseline
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - p11-dast-zap
+      - main
+    paths:
+      - 'app/**'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - 'compose.yaml'
+      - '.github/workflows/ci-p11-dast.yml'
+
+concurrency:
+  group: dast-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  zap-baseline:
+    name: ZAP Baseline Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Start application with Docker Compose
+        run: |
+          docker compose up -d --build
+          echo "Waiting for application to be ready..."
+
+      - name: Wait for application health check
+        run: |
+          max_attempts=30
+          attempt=0
+          while [ $attempt -lt $max_attempts ]; do
+            if curl -f http://localhost:8000/health > /dev/null 2>&1; then
+              echo "Application is ready!"
+              exit 0
+            fi
+            echo "Attempt $((attempt+1))/$max_attempts: Application not ready yet..."
+            sleep 2
+            attempt=$((attempt+1))
+          done
+          echo "Application failed to start"
+          docker compose logs
+          exit 1
+
+      - name: Run ZAP Baseline Scan
+        run: |
+          docker run --network host \
+            -v $(pwd)/EVIDENCE/P11:/zap/wrk:rw \
+            -t ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://localhost:8000 \
+            -r zap_baseline.html \
+            -J zap_baseline.json \
+            -I || true
+
+      - name: Check ZAP reports were generated
+        run: |
+          if [ ! -f "EVIDENCE/P11/zap_baseline.html" ]; then
+            echo "HTML report not found!"
+            exit 1
+          fi
+          if [ ! -f "EVIDENCE/P11/zap_baseline.json" ]; then
+            echo "JSON report not found!"
+            exit 1
+          fi
+          echo "ZAP reports generated successfully"
+
+      - name: Upload ZAP reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-reports
+          path: |
+            EVIDENCE/P11/zap_baseline.html
+            EVIDENCE/P11/zap_baseline.json
+          retention-days: 30
+
+      - name: Show scan summary
+        if: always()
+        run: |
+          echo "=== ZAP Baseline Scan Summary ==="
+          if [ -f "EVIDENCE/P11/zap_baseline.json" ]; then
+            echo "Scan completed. Check artifacts for detailed reports."
+            echo "Target: http://localhost:8000"
+          else
+            echo "Scan may have failed to generate reports"
+          fi
+
+      - name: Stop application
+        if: always()
+        run: docker compose down -v
